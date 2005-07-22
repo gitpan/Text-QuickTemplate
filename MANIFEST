@@ -1,0 +1,9 @@
+Changes
+Makefile.PL
+MANIFEST
+QuickTemplate.pm
+README
+t/doc.t
+t/dont.t
+t/fail.t
+META.yml                                 Module meta-data (added by MakeMaker)

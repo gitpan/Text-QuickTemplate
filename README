@@ -1,0 +1,71 @@
+Text::QuickTemplate version 0.01
+================================
+
+This module provides a simple, lightweight templating mechanism, in
+contrast to most (or all?) other CPAN templating modules, which try to
+be as full-featured as possible.
+
+You create a Text::QuickTemplate object with a string of boilerplate
+text.  Then later, you pass the object a hash of substitution keywords
+and values, and it returns the filled-in result string.
+
+EXAMPLES
+
+    $template = Text::QuickTemplate->new(<<END_TEMPLATE);
+    Dear {{to}},
+        Have a {{day_type}} day.
+    Your {{relation}},
+    {{from}}
+    END_TEMPLATE
+
+    $letter1 = $template->fill (
+         {to       => 'Professor Dumbledore',
+          relation => 'friend',
+          day_type => 'swell',
+          from     => 'Harry',
+        });
+
+    $letter2 = $template->fill (
+         {to       => 'Lord Voldemort',
+          relation => 'sworn enemy',
+          day_type => 'rotten',
+          from     => 'Harry',
+        });
+
+
+DEVELOPMENT STATE
+
+This is a brand-new module, so be wary.  It has a decent test suite,
+but it hasn't been extensively field-tested.  It should be considered
+"beta" software.
+
+If you find any bugs, or if any behavior of Text::QuickTemplate
+surprises you, I would be grateful if you could send me an email
+message about it.  Thanks.
+
+
+INSTALLATION
+
+To install this module, do the standard Perl module four-step:
+
+   perl Makefile.PL    or    perl Makefile.pl LIB='my/install/path'
+   make
+   make test
+   make install
+
+
+DEPENDENCIES
+
+This module requires these other modules and libraries:
+
+  Readonly
+  Test::More      (used by the test suite only)
+
+
+COPYRIGHT AND LICENSE
+
+Eric J. Roode, roode@cpan.org
+
+Copyright (c) 2005 by Eric J. Roode. All Rights Reserved.
+This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
