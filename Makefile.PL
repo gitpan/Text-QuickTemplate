@@ -4,7 +4,10 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     'NAME'		=> 'Text::QuickTemplate',
     'VERSION_FROM'	=> 'QuickTemplate.pm', # finds $VERSION
-    'PREREQ_PM'		=> {Readonly => 1.00}, # e.g., Module::Name => 1.1
+    'PREREQ_PM'		=> { # module_name    => version
+                            Readonly          => '1.00',
+                            Exception::Class  => '1.20',
+                           },
     ($] >= 5.005 ?    ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM => 'QuickTemplate.pm', # retrieve abstract from module
        AUTHOR     => 'Eric Roode <roode@cpan.org>') : ()),

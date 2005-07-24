@@ -1,11 +1,12 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         Text-QuickTemplate
-version:      0.01
+version:      0.02
 version_from: QuickTemplate.pm
 installdirs:  site
 requires:
-    Readonly:                      1
+    Exception::Class:              1.20
+    Readonly:                      1.00
 
 distribution_type: module
 generated_by: ExtUtils::MakeMaker version 6.17

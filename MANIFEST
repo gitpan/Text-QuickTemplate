@@ -4,6 +4,7 @@ MANIFEST
 QuickTemplate.pm
 README
 t/doc.t
-t/dont.t
-t/fail.t
+t/fill.t
+t/new.t
+t/prefill.t
 META.yml                                 Module meta-data (added by MakeMaker)

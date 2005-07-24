@@ -2,6 +2,10 @@ use strict;
 use Test::More tests => 6;
 BEGIN { use_ok('Text::QuickTemplate') };
 
+# Make sure the documentation examples are correct,
+# so as not to confuse anyone.
+
+
 my ($template, $letter1, $letter2);
 
 eval

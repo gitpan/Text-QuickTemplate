@@ -2,3 +2,8 @@ Revision history for Perl extension Text::QuickTemplate.
 
 0.01  2005 July 22
     - First version
+
+0.01  2005 July 24
+    - Uses Exception::Class for error handling now.
+    - More documentation on diagnostics.
+    - Much better test suite.
