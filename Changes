@@ -3,7 +3,11 @@ Revision history for Perl extension Text::QuickTemplate.
 0.01  2005 July 22
     - First version
 
-0.01  2005 July 24
+0.02  2005 July 24
     - Uses Exception::Class for error handling now.
     - More documentation on diagnostics.
     - Much better test suite.
+
+0.03  2005 July ??
+    - Changed Makefile.PL to require v1.21 of Exception::Class.
+    - Fix some minor typos in the documentation.

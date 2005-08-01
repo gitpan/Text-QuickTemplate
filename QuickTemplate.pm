@@ -1,10 +1,14 @@
+=for gpg
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
 =head1 NAME
 
 Text::QuickTemplate - A simple, lightweight text fill-in class.
 
 =head1 VERSION
 
-This documentation describes v0.02 of Text::QuickTemplate, July 24, 2005.
+This documentation describes v0.03 of Text::QuickTemplate, July 24, 2005.
 
 =cut
 
@@ -14,7 +18,7 @@ use strict;
 use warnings;
 use Readonly;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 Readonly our $DONTSET => [];
 
 # Always export the $DONTSET variable
@@ -438,9 +442,9 @@ Removes any pre_filled hash references in the object.
  # yields: "<i>Green Eggs and Ham</i>, by Dr. Seuss"
 
  $bibl_3 = $book_t->fill({author => 'Isaac Asimov'});
- # Dies with "could not resolve the following symbol: title"
+ # Dies with "Could not resolve the following symbol: title"
 
- $bibl_3 = $book_t->fill({author => 'Isaac Asimov',
+ $bibl_4 = $book_t->fill({author => 'Isaac Asimov',
                           title  => $DONTSET });
  # yields: "<i>{{title}}</i>, by Isaac Asimov"
 
@@ -489,7 +493,7 @@ for your exception handling:
      warn "Bad option: " . $ex->name();
      ...
 
-If you choose to (or cannot) handle a particular type of exception
+If you choose not to (or cannot) handle a particular type of exception
 (for example, there's not much to be done about a parameter error),
 you should rethrow the error:
 
@@ -527,7 +531,7 @@ There's an error in one or more options passed to the constructor
 C<new>.
 
 This exception has one method, C<name()>, which returns the name of
-the option that had a problem (for example, 'C<delimiter>').
+the option that had a problem (for example, 'C<delimiters>').
 
 As a string, this exception provides a human-readable message about
 what the problem was.
@@ -567,3 +571,15 @@ message.
 Copyright (c) 2005 by Eric J. Roode. All Rights Reserved.
 This module is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
+
+=begin gpg
+
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.1 (Cygwin)
+
+iD8DBQFC7l+QY96i4h5M0egRAoYKAJ9IYg/92w7CQBJ0BEmt8aN3BqJqvQCgygul
+IpN3Ajbw35nEM/jPt12X8C0=
+=Csa4
+-----END PGP SIGNATURE-----
+
+=end gpg

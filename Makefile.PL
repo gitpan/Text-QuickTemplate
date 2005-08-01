@@ -6,7 +6,7 @@ WriteMakefile(
     'VERSION_FROM'	=> 'QuickTemplate.pm', # finds $VERSION
     'PREREQ_PM'		=> { # module_name    => version
                             Readonly          => '1.00',
-                            Exception::Class  => '1.20',
+                            Exception::Class  => '1.21',
                            },
     ($] >= 5.005 ?    ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM => 'QuickTemplate.pm', # retrieve abstract from module

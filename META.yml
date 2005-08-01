@@ -1,11 +1,11 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         Text-QuickTemplate
-version:      0.02
+version:      0.03
 version_from: QuickTemplate.pm
 installdirs:  site
 requires:
-    Exception::Class:              1.20
+    Exception::Class:              1.21
     Readonly:                      1.00
 
 distribution_type: module
