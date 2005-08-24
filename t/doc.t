@@ -1,5 +1,5 @@
 use strict;
-use Test::More tests => 18;
+use Test::More tests => 25;
 BEGIN { use_ok('Text::QuickTemplate') };
 
 # Make sure the documentation examples are correct,
@@ -125,3 +125,69 @@ is ($@, q{}, q{No exception for creating bibliography 4});
 
 is ($bibl_4, "<i>{{title}}</i>, by Isaac Asimov",
     q{Correct result for bibliography 4});
+
+
+# Add'l docs added 8/12/2005
+
+my ($fh1, $fh2, $report_line, $line);
+eval
+{
+    $report_line = Text::QuickTemplate->new('{{Name:-20s}} {{Grade:10d}}');
+    open $fh1, '>', 'fh1' or die "Can't write 'fh1': $!";
+    open $fh2, '>', 'fh2' or die "Can't write 'fh2': $!";
+    select $fh1;
+};
+
+my $eval1 = $@;
+
+eval
+{
+    # Example using format specification:
+    print $report_line->fill({Name => 'Susanna', Grade => 4});
+    # prints "Susanna                       4"
+
+    $line = QTsprintf '{{Name:-20s}} {{Grade:10d}}', {Name=>'Gwen', Grade=>6};
+    # $line is now "Gwen                          6"
+
+    QTfprintf $fh2, '{{number:-5.2f}}', {number => 7.4};
+    # prints " 7.40" to STDERR.
+};
+
+my $eval2 = $@;
+
+print "--end-of-test";   # ensure $fh1 still selected
+select STDOUT;
+
+is ($eval1, q{}, q{Set up for format/printf tests});
+is ($eval2, q{}, q{Execute format/printf tests});
+
+my ($str1, $str2);
+eval
+{
+    close $fh1 or die;
+    close $fh2 or die;
+    undef $fh1;
+    undef $fh2;
+    open $fh1, '<', 'fh1' or die "Can't read 'fh1': $!";
+    open $fh2, '<', 'fh2' or die "Can't read 'fh2': $!";
+
+    local $/ = undef;
+    $str1 = <$fh1>;
+    $str2 = <$fh2>;
+    close $fh1 or die;
+    close $fh2 or die;
+};
+
+is ($@, q{}, q{Grabbed test resuts});
+
+is ($str1, "Susanna                       4--end-of-test", q{Susanna okay});
+is ($line, "Gwen                          6", q{Gwen okay});
+is ($str2, "7.40 ", q{7.40 okay});
+
+eval
+{
+    unlink 'fh1';
+    unlink 'fh2';
+};
+is ($@, q{}, q{removed test files okay});
+

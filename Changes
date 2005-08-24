@@ -8,6 +8,11 @@ Revision history for Perl extension Text::QuickTemplate.
     - More documentation on diagnostics.
     - Much better test suite.
 
-0.03  2005 July ??
+0.03  2005 July 27
     - Changed Makefile.PL to require v1.21 of Exception::Class.
     - Fix some minor typos in the documentation.
+
+0.04  2005 August 24
+    - Added printf-like functions
+    - Added printf-like format specifications
+    - Added default() method.

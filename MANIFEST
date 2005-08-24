@@ -3,8 +3,10 @@ Makefile.PL
 MANIFEST
 QuickTemplate.pm
 README
+t/default.t
 t/doc.t
 t/fill.t
 t/new.t
 t/prefill.t
+t/printf.t
 META.yml                                 Module meta-data (added by MakeMaker)

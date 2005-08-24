@@ -1,5 +1,5 @@
 use strict;
-use Test::More tests => 27;
+use Test::More tests => 28;
 use Text::QuickTemplate;
 
 # Check that fill() fails when it should.
@@ -193,6 +193,35 @@ is $letter, <<END_LETTER, q{Correct result with first come, first served};
 Dear Lord Voldemort,
     Have a supercalifragilisticexpialidocious day.
 Your sworn enemy,
+Harry
+END_LETTER
+
+
+undef $template;
+eval
+{
+    $template = Text::QuickTemplate->new(<<END_TEMPLATE);
+Dear {{ to}},
+    Have a {{day_type }} day.
+Your {{ relation }},
+{{from}}
+END_TEMPLATE
+};
+
+
+undef $letter;
+eval
+{
+    $letter = $template->fill({to       => 'Lord Voldemort',
+                               from     => 'Harry',
+                               day_type => 'rotten',
+                               relation => 'sworn enemy'});
+};
+
+is ($letter, <<END_LETTER, 'Poorly-formatted keywords not substituted');
+Dear {{ to}},
+    Have a {{day_type }} day.
+Your {{ relation }},
 Harry
 END_LETTER
 

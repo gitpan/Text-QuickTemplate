@@ -8,7 +8,7 @@ Text::QuickTemplate - A simple, lightweight text fill-in class.
 
 =head1 VERSION
 
-This documentation describes v0.03 of Text::QuickTemplate, July 24, 2005.
+This documentation describes v0.04 of Text::QuickTemplate, August 24, 2005.
 
 =cut
 
@@ -18,15 +18,19 @@ use strict;
 use warnings;
 use Readonly;
 
-our $VERSION = '0.03';
-Readonly our $DONTSET => [];
+our $VERSION = '0.04';
+Readonly our $DONTSET => [];    # Unique identifier
 
 # Always export the $DONTSET variable
+# Always export the QTprintf subroutines
 sub import
 {
     my ($pkg) = caller;
     no strict 'refs';
-    *{$pkg.'::DONTSET'} = \$DONTSET;
+    *{$pkg.'::DONTSET'}   = \$DONTSET;
+    *{$pkg.'::QTprintf'}  = \&QTprintf;
+    *{$pkg.'::QTsprintf'} = \&QTsprintf;
+    *{$pkg.'::QTfprintf'} = \&QTfprintf;
 }
 
 # Declare exception classes
@@ -115,6 +119,7 @@ sub new
     my %delimiters_for;
     my %regex_for;
     my %value_hashes_for;
+    my %defaults_for;
     my %bad_keys_of;
 
     ## Initializer
@@ -132,6 +137,7 @@ sub new
             push @occupied, '%delimiters_for'    if exists $delimiters_for  {$self};
             push @occupied, '%regex_for'         if exists $regex_for       {$self};
             push @occupied, '%value_hashes_for'  if exists $value_hashes_for{$self};
+            push @occupied, '%defaults_for'      if exists $defaults_for    {$self};
             push @occupied, '%bad_keys_of'       if exists $bad_keys_of     {$self};
 
             QuickTemplate::X::InternalError->throw(
@@ -187,7 +193,14 @@ sub new
 
         # $1 is the keyword plus its delimiters; $2 is the keyword by itself.
         $regex_for{$self} =
-            qr/( $delimiters_for{$self}[0]  (\w+)  $delimiters_for{$self}[1] )/xsm;
+            qr/(                                # $1: capture whole expression
+                 $delimiters_for{$self}[0]      # Opening delimiter
+                 (\w+)                          # $2: keyword
+                 (?:  :                         # Maybe a colon and...
+                      %? (-? [\d.]* [A-Za-z]+ ) #   ...a printf format
+                 )?
+                 $delimiters_for{$self}[1]      # Closing delimiter
+              )/xsm;
 
         return;
     }
@@ -201,6 +214,7 @@ sub new
         delete $delimiters_for  {$self};
         delete $regex_for       {$self};
         delete $value_hashes_for{$self};
+        delete $defaults_for    {$self};
         delete $bad_keys_of     {$self};
     }
 
@@ -219,11 +233,27 @@ sub new
         return;
     }
 
+    # Stack up hash values for later substitution
+    sub default
+    {
+        my $self = shift;
+
+        # Validate the parameters
+        foreach my $arg (@_)
+        {
+            QuickTemplate::X::ParameterError->throw("Argument to default() is not a hashref")
+                if ref $arg ne 'HASH';
+        }
+        push @{ $defaults_for{$self} }, @_;
+        return;
+    }
+
     # Clear any pre-stored hashes
     sub clear_values
     {
         my $self = shift;
         @{ $value_hashes_for{$self} } = [];
+        @{ $defaults_for    {$self} } = [];
         return;
     }
 
@@ -231,15 +261,19 @@ sub new
     sub fill
     {
         my $self = shift;
-        my @hashes = @_;
+        my @fill_hashes = @_;
 
         # Validate the parameters
-        foreach my $arg (@hashes)
+        foreach my $arg (@fill_hashes)
         {
             QuickTemplate::X::ParameterError->throw("Argument to fill() is not a hashref")
                 if ref $arg ne 'HASH';
         }
-        push @{ $value_hashes_for{$self} }, @hashes;
+
+        my @hashes;
+        push @hashes, @{ $value_hashes_for{$self}}  if exists $value_hashes_for{$self};
+        push @hashes, @fill_hashes;
+        push @hashes, @{ $defaults_for    {$self}}  if exists $defaults_for    {$self};
 
         # Fetch other attributes
         my $str = $boilerplate_for{$self};
@@ -247,10 +281,7 @@ sub new
 
         # Do the subsitution
         $bad_keys_of{$self} = [];
-        $str =~ s/$rex/$self->_substitution_of($1, $2)/ge;
-
-        # Restore the pre-set list of hashes (if any)
-        splice @{ $value_hashes_for{$self} }, 0 - scalar(@hashes);
+        $str =~ s/$rex/$self->_substitution_of(\@hashes, $1, $2, $3)/ge;
 
         # Any unfulfilled substitutions?
         my $bk = $bad_keys_of{$self};    # shortcut for the next few lines
@@ -271,9 +302,9 @@ sub new
     sub _substitution_of
     {
         my $self = shift;
-        my ($whole_expr, $keyword) = @_;
+        my ($values_aref, $whole_expr, $keyword, $format) = @_;
 
-        Value_Hash: foreach my $hashref (@{$value_hashes_for{$self}})
+        Value_Hash: foreach my $hashref (@$values_aref)
         {
             next unless exists $hashref->{$keyword};
 
@@ -283,7 +314,8 @@ sub new
             return $whole_expr
                 if ref($value) eq 'ARRAY'  &&  $value eq $DONTSET;
 
-            return defined $value? $value : q{};
+            $value = q{}  if !defined $value;
+            return defined $format? sprintf "%$format", $value : $value;
         }
 
         # Never found a match?  Pity.
@@ -325,21 +357,84 @@ sub new
 } # end encapsulation enclosure
 
 
+
+# printf-like convenience functions
+
+sub QTprintf
+{
+    my $string = QT_printf_guts('QTprintf', @_);
+    print $string;
+}
+
+sub QTsprintf
+{
+    return QT_printf_guts('QTsprintf', @_);
+}
+
+sub QTfprintf
+{
+    QuickTemplate::X::ParameterError->throw
+        ("QTfprintf() requires at least two arguments")
+        if @_ < 2;
+
+    my $fh = shift;
+    print {$fh} QT_printf_guts('QTfprintf', @_);
+}
+
+sub QT_printf_guts
+{
+    my $which = shift;
+    QuickTemplate::X::ParameterError->throw
+        ("$which() requires at least one argument")
+        if @_ == 0;
+
+    my $format = shift;
+    my @value_hashes = @_;
+
+    # Validate the parameters
+    foreach my $arg (@value_hashes)
+    {
+        QuickTemplate::X::ParameterError->throw
+            ("Argument to $which() is not a hashref")
+            if ref $arg ne 'HASH';
+    }
+
+    my $template = Text::QuickTemplate->new ($format);
+    return $template->fill(@value_hashes);
+}
+
 1;
 __END__
 
 
 =head1 SYNOPSIS
 
+ # Create and fill a template:
  $template = Text::QuickTemplate->new($string, \%options);
 
+ # Set default values:
+ $template->default(\%values);
+
+ # Set some override values:
+ $template->pre_fill(\%values);
+
+ # Fill it in, rendering the result string:
  $result = $template->fill(\%values);
+
+ # printf-like usage
+ QTprintf ($format, \%values);
+
+ # sprintf-like usage
+ $result = QTsprintf ($filehandle, $format, \%values);
+
+ # fprintf-like usage (print to a filehandle)
+ QTfprintf ($filehandle, $format, \%values);
 
 
 =head1 OPTIONS
 
  delimiters => [ '{{', '}}' ];          # may be strings
- delimiters => [ qr/\{\{/, qr/\{\{/ ];  # and/or regexps
+ delimiters => [ qr/\{\{/, qr/\}\}/ ];  # and/or regexps
 
 
 =head1 DESCRIPTION
@@ -349,10 +444,38 @@ powerful than Text::QuickTemplate.  When you need that power, they're
 wonderful.  But when you don't, they're overkill.
 
 This module provides a very simple, lightweight, quick and easy
-templating mechanism for when you don't need those other, powerful but
-cumbersome, modules.
+templating mechanism for when you don't need those other
+powerful-but-cumbersome modules.
 
-You create a template object that contains the boilerplate text.
+First, you create a template object that contains the boilerplate
+text.  See the next section for information on how to format it
+properly.
+
+Then, when it is necessary to render the final text (with placeholders
+filled in), you use the L</fill> method, passing it one or more
+references of hashes of values to be substituted into the original
+boilerplate text.  The special value $DONTSET indicates that the
+keyword (and its delimiters) are to remain in the boilerplate text,
+unsubstituted.
+
+That's it.  No control flow, no executable content, no filesystem
+access.  Never had it, never will.
+
+=head1 TEMPLATE FORMAT
+
+When you create a template object, or when you use one of the
+printf-like functions, you must supply a I<template>, which is a
+string that contains I<placeholders> that will be filled in later (by
+the L</fill> method).  All other text in the template will remain
+undisturbed, as-is, unchanged.
+
+I<Examples:>
+
+ "This is a template."
+ "Here's a placeholder: {{fill_me_in}}"
+ "Can occur multiple times: {{name}} {{phone}} {{name}}"
+ "Optionally, can use printf formats: {{name:20s}} {{salary:%.2f}}"
+
 Substitution placeholders within the text are indicated by keywords,
 set off from the surrounding text by a pair of delimiters.  (By
 default the delimters are C<{{> and C<}}>, since double curly braces
@@ -363,22 +486,40 @@ characters (that is, alphabetics, numerics, and the underscore), and
 there must be no spaces or other characters between the keyword and
 its delimiters.  This strictness is considered a feature.
 
-When it is necessary to render the final text (with placeholders
-filled in), you use the C<fill> method, passing it one or more
-references of hashes of values to be substituted into the original
-boilerplate text.  The special value $DONTSET indicates that the
-keyword (and its delimiters) are to remain in the boilerplate text,
-unsubstituted.
+Each keyword may optionally be followed (still within the delimiters)
+by a colon (C<:>) and a printf format.  If a format is specified, it
+will be used to format the entry when expanded.  The format may omit
+the leading C<%> symbol, or it may include it.
 
-That's it.  No control flow, no executable content, no filesystem
-access.  Never had it, never will.
+=head1 COMMON MISTAKE
 
+If Text::QuickTemplate does not expand a placeholder, check to make
+sure that you did not include any spaces around the placeholder name,
+and did not use any non-"word" (regex C<\W>) characters in the name.
+Text::QuickTemplate is very strict about spaces and other characters;
+this is so that a non-placeholder does not get expanded by mistake.
+
+ Right: {{lemon}}
+ Right: {{pi:%.9f}}
+ Wrong: {{ lemon }}
+ Wrong: {{lemon pie}}
+ Wrong: {{pi: %.9f}}
+
+Text::QuickTemplate will silently leave incorrectly-formatted
+placeholders alone.  This is in case you are generating code; you
+don't want something like
+
+ sub foo() {{bar => 1}};
+
+to be mangled or to generate errors.
 
 =head1 METHODS
 
 =over 4
 
 =item new
+
+Constructor.
 
  $template_object = Text::QuickTemplate->new($boilerplate, \%options);
 
@@ -391,6 +532,8 @@ a starting delimiter and an ending delimiter.
 
 =item fill
 
+Render the formatted string.
+
  $result_string = $template->fill($hashref);
  $result_string = $template->fill($hashref, $hashref, ...);
 
@@ -402,32 +545,99 @@ key.  As soon as one is found, the template moves on to the next
 placeholder.  Another way of looking at this behavior is "The first
 hashref that fulfills a given placeholder -- wins."
 
-If the resulting value is C<$DONTSET>, the placeholder is left intact
-in the template.
+If the resulting value is the special constant C<$DONTSET>, the
+placeholder is left intact in the template.
 
 If no value for a placeholder is found among any of the hash
 references passed, an exception is thrown.
 
 =item pre_fill
 
+Set values without rendering.
+
  $template->pre_fill($hashref, ...);
 
 Specifies one or more sets of key=>value pairs to be used by the
-C<fill> method in addition to (and higher priority than) the ones
-passed to C<fill>.
+L</fill> method in addition to (and higher priority than) the ones
+passed to L</fill>.
 
 This can be useful if some template values are set when the template
 is created, but the template is filled elsewhere in the program,
 and you don't want to pass variables around.
 
+=item default
+
+Set default values without rendering.
+
+ $template->default($hashref, ...);
+
+Like L</pre_fill>, specifies key=>value pairs to be used by L</fill>,
+but where L</pre_fill>'s values have a higher priority than those
+specified by L</fill>, L</default>'s are I<lower>.  This can be used
+at the time the object is created to give default values that only get
+used if the call to L</fill> (or L</pre_fill>) don't override them.
+
 =item clear_values
+
+Clear default and pre-filled values.
 
  $template->clear_values();
 
-Removes any pre_filled hash references in the object.
+Removes any L</pre_fill>ed or L</default> hash references in the
+object.
 
 =back
 
+=head1 FUNCTIONS
+
+=over 4
+
+=item QTprintf
+
+Render and print.
+
+ QTprintf $format, \%values
+
+Like Perl's printf, QTprintf takes a format string and a list of
+values.  Unlike Perl's printf, the placeholders and values have names.
+Like Perl's printf, the result string is sent to the default
+filehandle (usually STDOUT).
+
+This is equivalent to:
+
+ my $template = Text::QuickTemplate->new ($format);
+ printf $template->fill (\%values);
+
+QTprintf returns the same value as printf.
+
+The original inspiration for this module came as the author was
+scanning through a long and complex list of arguments to a printf
+template, and lost track of which value when into which position.
+
+=item QTsprintf
+
+Render to string.
+
+ $string = QTsprintf $format, \%values;
+
+Same as L</QTprintf>, except that it returns the formatted string
+instead of sending it to the default filehandle.
+
+This is equivalent to:
+
+ $string = do { my $t = Text::QuickTemplate->new($format);
+                $t->fill (\%values)  };
+
+=item QTfprintf
+
+Render and print to filehandle.
+
+ QTfprintf $filehandle, $format, \%values;
+
+Like L</QTprintf>, except that it sends the formatted string to the
+filehandle specified, instead of to the currently-selected filehandle.
+
+=back
 
 =head1 EXAMPLES
 
@@ -448,11 +658,25 @@ Removes any pre_filled hash references in the object.
                           title  => $DONTSET });
  # yields: "<i>{{title}}</i>, by Isaac Asimov"
 
+ # Example using format specification:
+ $report_line = Text::QuickTemplate->new('{{Name:-20s}} {{Grade:10d}}');
+ print $report_line->fill({Name => 'Susanna', Grade => 4});
+ # prints "Susanna                       4"
+
+ $line = QTsprintf '{{Name:-20s}} {{Grade:10d}}', {Name=>'Gwen', Grade=>6};
+ # $line is now "Gwen                          6"
+
+ QTfprintf *STDERR, '{{number:-5.2f}}', {number => 7.4};
+ # prints "7.40 " to STDERR.
 
 =head1 EXPORTS
 
-This module exports the symbol C<$DONTSET> into the caller's
-namespace.
+This module exports the following symbols into the caller's namespace:
+
+ $DONTSET
+ QTprintf
+ QTsprintf
+ QTfprintf
 
 
 =head1 REQUIREMENTS
@@ -465,7 +689,7 @@ This module is dependent upon the following other CPAN modules:
 
 =head1 DIAGNOSTICS
 
-Text::QuickTemplate uses Exception::Class objects for throwing
+Text::QuickTemplate uses L<Exception::Class> objects for throwing
 exceptions.  If you're not familiar with Exception::Class, don't
 worry; these exception objects work just like C<$@> does with C<die>
 and C<croak>, but they are easier to work with if you are trapping
@@ -515,10 +739,9 @@ you should rethrow the error:
 
 Class: C<QuickTemplate::X::ParameterError>
 
-You called a Text::QuickTemplate method with
-one or more bad parameters.  Since this is almost certainly a coding
-error, there is probably not much use in handling this sort of
-exception.
+You called a Text::QuickTemplate method with one or more bad
+parameters.  Since this is almost certainly a coding error, there is
+probably not much use in handling this sort of exception.
 
 As a string, this exception provides a human-readable message about
 what the problem was.
@@ -528,7 +751,7 @@ what the problem was.
 Class C<QuickTemplate::X::OptionError>
 
 There's an error in one or more options passed to the constructor
-C<new>.
+L</new>.
 
 This exception has one method, C<name()>, which returns the name of
 the option that had a problem (for example, 'C<delimiters>').
@@ -541,8 +764,8 @@ what the problem was.
 Class C<QuickTemplate::X::KeyNotFound>
 
 One or more subsitution keywords in the template string were not found
-in any of the value hashes passed to C<fill> or C<pre_fill>.  This
-exception is thrown by C<fill>.
+in any of the value hashes passed to L</fill>, L</pre_fill>, or
+L</default>.  This exception is thrown by L</fill>.
 
 This exception has one method, C<symbols()>, which returns a reference
 to an array containing the names of the keywords that were not found.
@@ -577,9 +800,9 @@ under the same terms as Perl itself.
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.4.1 (Cygwin)
 
-iD8DBQFC7l+QY96i4h5M0egRAoYKAJ9IYg/92w7CQBJ0BEmt8aN3BqJqvQCgygul
-IpN3Ajbw35nEM/jPt12X8C0=
-=Csa4
+iD8DBQFDDMnnY96i4h5M0egRAujlAJ9Amhw0slE70C5BiTln5iWRp/v4dQCfYNal
+uFBwpkkO6Q7+qg36rNjkEVU=
+=GK1f
 -----END PGP SIGNATURE-----
 
 =end gpg
