@@ -2,7 +2,7 @@ use strict;
 use Test::More tests => 32;
 use Text::QuickTemplate;
 
-# Check that fill() fails when it should.
+# Test printf-like functions.
 
 sub begins_with
 {

@@ -16,3 +16,6 @@ Revision history for Perl extension Text::QuickTemplate.
     - Added printf-like functions
     - Added printf-like format specifications
     - Added default() method.
+
+0.05  2005 September 8
+    - Added extended formatting codes (comma, dollar-sign).

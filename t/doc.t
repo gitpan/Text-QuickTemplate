@@ -1,5 +1,5 @@
 use strict;
-use Test::More tests => 25;
+use Test::More tests => 27;
 BEGIN { use_ok('Text::QuickTemplate') };
 
 # Make sure the documentation examples are correct,
@@ -191,3 +191,13 @@ eval
 };
 is ($@, q{}, q{removed test files okay});
 
+
+# Extended formatting example, added 9/8/2005
+my $str;
+eval
+{
+    $str = QTsprintf '{{widgets:%10d:,}} at {{price:%.2f:,$}} each',
+                     {widgets => 1e6, price => 1234};
+};
+is ($@, q{}, q{Extended format printf: no error});
+is ($str, ' 1,000,000 at $1,234.00 each', 'Extended format printf: correct value.');

@@ -8,7 +8,7 @@ Text::QuickTemplate - A simple, lightweight text fill-in class.
 
 =head1 VERSION
 
-This documentation describes v0.04 of Text::QuickTemplate, August 24, 2005.
+This documentation describes v0.05 of Text::QuickTemplate, September 8, 2005.
 
 =cut
 
@@ -18,7 +18,7 @@ use strict;
 use warnings;
 use Readonly;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 Readonly our $DONTSET => [];    # Unique identifier
 
 # Always export the $DONTSET variable
@@ -97,6 +97,14 @@ sub QuickTemplate::X::full_message
 
     $msg =~ s/[ \t]+\z//;   # remove any trailing spaces (is this necessary?)
     return $msg . q{ } . $self->location() . qq{\n};
+}
+
+# Comma formatting.  From the Perl Cookbook.
+sub commify ($)
+{
+    my $rev_num = reverse shift;  # The number to be formatted, reversed.
+    $rev_num =~ s/(\d\d\d)(?=\d)(?!\d*\.)/$1,/g;
+    return scalar reverse $rev_num;
 }
 
 
@@ -192,14 +200,17 @@ sub new
         }
 
         # $1 is the keyword plus its delimiters; $2 is the keyword by itself.
+        # $3 is the printf format, if any; $4 is the extended format.
         $regex_for{$self} =
-            qr/(                                # $1: capture whole expression
-                 $delimiters_for{$self}[0]      # Opening delimiter
-                 (\w+)                          # $2: keyword
-                 (?:  :                         # Maybe a colon and...
-                      %? (-? [\d.]* [A-Za-z]+ ) #   ...a printf format
+            qr/(                                    # $1: capture whole expression
+                 $delimiters_for{$self}[0]          # Opening delimiter
+                 (\w+)                              # $2: keyword
+                 (?:  :                             # Maybe a colon and...
+                      %? (-? [\d.]* [A-Za-z]{1,2} ) #   $3: ...a printf format
+                      (?:   :                       #   and maybe another colon
+                            ([,\$]+) )?             #   $4: and extended format chars
                  )?
-                 $delimiters_for{$self}[1]      # Closing delimiter
+                 $delimiters_for{$self}[1]          # Closing delimiter
               )/xsm;
 
         return;
@@ -281,7 +292,7 @@ sub new
 
         # Do the subsitution
         $bad_keys_of{$self} = [];
-        $str =~ s/$rex/$self->_substitution_of(\@hashes, $1, $2, $3)/ge;
+        $str =~ s/$rex/$self->_substitution_of(\@hashes, $1, $2, $3, $4)/ge;
 
         # Any unfulfilled substitutions?
         my $bk = $bad_keys_of{$self};    # shortcut for the next few lines
@@ -302,7 +313,8 @@ sub new
     sub _substitution_of
     {
         my $self = shift;
-        my ($values_aref, $whole_expr, $keyword, $format) = @_;
+        my ($values_aref, $whole_expr, $keyword, $format, $extend) = @_;
+        my %special_opts = defined $extend? map {$_ => 1} split //, $extend, -1 : ();
 
         Value_Hash: foreach my $hashref (@$values_aref)
         {
@@ -315,7 +327,24 @@ sub new
                 if ref($value) eq 'ARRAY'  &&  $value eq $DONTSET;
 
             $value = q{}  if !defined $value;
-            return defined $format? sprintf "%$format", $value : $value;
+            return $value if !defined $format;
+
+            $value = sprintf "%$format", $value;
+
+            # Special extended formatting
+            if (defined $extend)
+            {
+                # Currently, ',' and '$' are defined
+                my $v_len = length $value;
+                $value = commify $value     if $special_opts{','};
+                $value =~ s/([^ ])/\$$1/    if $special_opts{'$'};
+                my $length_diff = length($value) - $v_len;
+                $value =~ s/^ {0,$length_diff}//;
+                $length_diff = length($value) - $v_len;
+                $value =~ s/ {0,$length_diff}$//;
+            }
+
+            return $value;
         }
 
         # Never found a match?  Pity.
@@ -323,7 +352,6 @@ sub new
         push @{ $bad_keys_of{$self} }, $keyword;
         return $whole_expr;
     }
-
 
     # Debugging routine -- dumps a string representation of the object
     sub _dump
@@ -471,15 +499,17 @@ undisturbed, as-is, unchanged.
 
 I<Examples:>
 
- "This is a template."
- "Here's a placeholder: {{fill_me_in}}"
- "Can occur multiple times: {{name}} {{phone}} {{name}}"
- "Optionally, can use printf formats: {{name:20s}} {{salary:%.2f}}"
+ 'This is a template.'
+ 'Here's a placeholder: {{fill_me_in}}'
+ 'Can occur multiple times: {{name}} {{phone}} {{name}}'
+ 'Optionally, can use printf formats: {{name:20s}} {{salary:%.2f}}'
+ 'Fancier formats: {{salary:%.2f:,$}}'
 
 Substitution placeholders within the text are indicated by keywords,
 set off from the surrounding text by a pair of delimiters.  (By
-default the delimters are C<{{> and C<}}>, since double curly braces
-are rare in programming languages [and natural languages]).
+default the delimters are C<{{> and C<}}>, because that's easy to
+remember, and since double curly braces are rare in programming
+languages [and natural languages]).
 
 Keywords between the delimiters must be comprised entirely of "word"
 characters (that is, alphabetics, numerics, and the underscore), and
@@ -490,6 +520,16 @@ Each keyword may optionally be followed (still within the delimiters)
 by a colon (C<:>) and a printf format.  If a format is specified, it
 will be used to format the entry when expanded.  The format may omit
 the leading C<%> symbol, or it may include it.
+
+If a printf format is supplied, it may optionally be followed by
+another colon and zero or more special "extended formatting"
+characters.  Currently, two such characters are recognized: C<,>
+(comma) and C<$> (dollar sign).  Each of these is only useful if the
+placeholder is being replaced by a number.  If a comma character is
+used, commas will be inserted every three positions to the left of the
+decimal point.  If a dollar-sign character is used, a dollar sign will
+be placed immediately to the left of the first digit of the number.
+
 
 =head1 COMMON MISTAKE
 
@@ -509,7 +549,7 @@ Text::QuickTemplate will silently leave incorrectly-formatted
 placeholders alone.  This is in case you are generating code; you
 don't want something like
 
- sub foo() {{bar => 1}};
+ sub foo {{bar => 1}};
 
 to be mangled or to generate errors.
 
@@ -543,7 +583,7 @@ the hashref(s) supplied.
 For each placeholder, the hashrefs are examined in turn for a matching
 key.  As soon as one is found, the template moves on to the next
 placeholder.  Another way of looking at this behavior is "The first
-hashref that fulfills a given placeholder -- wins."
+hashref that fulfills a given placeholder... wins."
 
 If the resulting value is the special constant C<$DONTSET>, the
 placeholder is left intact in the template.
@@ -606,7 +646,7 @@ filehandle (usually STDOUT).
 This is equivalent to:
 
  my $template = Text::QuickTemplate->new ($format);
- printf $template->fill (\%values);
+ print $template->fill (\%values);
 
 QTprintf returns the same value as printf.
 
@@ -668,6 +708,11 @@ filehandle specified, instead of to the currently-selected filehandle.
 
  QTfprintf *STDERR, '{{number:-5.2f}}', {number => 7.4};
  # prints "7.40 " to STDERR.
+
+ # Example using extended formatting characters:
+ $str = QTsprintf '{{widgets:%10d:,}} at {{price:%.2f:,$}} each',
+                   {widgets => 1e6, price => 1234};
+ # $str is now: " 1,000,000 at $1,234.00 each"
 
 =head1 EXPORTS
 
@@ -800,9 +845,9 @@ under the same terms as Perl itself.
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.4.1 (Cygwin)
 
-iD8DBQFDDMnnY96i4h5M0egRAujlAJ9Amhw0slE70C5BiTln5iWRp/v4dQCfYNal
-uFBwpkkO6Q7+qg36rNjkEVU=
-=GK1f
+iD8DBQFDIMDgY96i4h5M0egRAt/UAKD6eA4mpuVM/HdTdkmyChrBIA2zwwCcD273
+mM5oDwpOTsWGgTIBOC/IHY0=
+=6qE6
 -----END PGP SIGNATURE-----
 
 =end gpg
